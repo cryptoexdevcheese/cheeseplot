@@ -1,0 +1,13 @@
+{
+  "name": "cheese-plot",
+  "version": "1.0.0",
+  "description": "CheesePlot - Sovereign P2P Geodetic Surveyor & Cadastre",
+  "main": "app.js",
+  "scripts": {
+    "compile": "npx hardhat compile"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.4"
+  }
+}
