@@ -1,0 +1,16 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "contracts/**",
+      "scripts/**",
+      "hardhat.config.js",
+      "package.json",
+      "package-lock.json",
+      "test-cadastre-math.js"
+    ]
+  }
+}
