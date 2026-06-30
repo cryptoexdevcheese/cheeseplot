@@ -1,0 +1,321 @@
+/* ============================================================
+   CHEESEPLOT — style-additions.css
+   Append these styles (or link this file) alongside style.css
+   ============================================================ */
+
+/* ── Leaflet map container ──────────────────────────────────── */
+#map {
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  border-radius: 10px;
+  z-index: 1;
+  background: #0a0a14;
+}
+/* Keep Leaflet controls readable on dark background */
+.leaflet-control-zoom a {
+  background: rgba(20, 20, 35, 0.9) !important;
+  color: var(--cheese-gold, #f59e0b) !important;
+  border-color: rgba(245,158,11,0.25) !important;
+}
+.leaflet-control-attribution {
+  background: rgba(0,0,0,0.6) !important;
+  color: rgba(255,255,255,0.4) !important;
+  font-size: 9px !important;
+}
+
+/* ── Boundary node marker ───────────────────────────────────── */
+.b-node {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.85);
+  border: 2px solid #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: #000;
+  cursor: grab;
+  box-shadow: 0 0 8px rgba(245,158,11,0.6);
+  transition: transform 0.15s;
+}
+.b-node:hover { transform: scale(1.25); }
+
+/* ── Workflow stepper bar ───────────────────────────────────── */
+.workflow-stepper-bar {
+  grid-column: 1 / -1;
+  background: rgba(10, 10, 20, 0.8);
+  border-bottom: 1px solid var(--border-glass, rgba(255,255,255,0.08));
+  padding: 0.6rem 1.5rem;
+  backdrop-filter: blur(10px);
+  position: sticky; top: 0; z-index: 100;
+}
+.workflow-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  overflow-x: auto;
+}
+.step-item {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px; flex-shrink: 0;
+}
+.step-circle {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; color: rgba(255,255,255,0.3);
+  transition: all 0.35s;
+}
+.step-label {
+  font-size: 0.62rem; font-weight: 600; color: rgba(255,255,255,0.3);
+  text-align: center; white-space: nowrap;
+  transition: color 0.35s;
+}
+.step-item.active .step-circle {
+  border-color: var(--cheese-gold, #f59e0b);
+  background: rgba(245,158,11,0.15);
+  color: var(--cheese-gold, #f59e0b);
+  box-shadow: 0 0 12px rgba(245,158,11,0.4);
+}
+.step-item.active .step-label { color: var(--cheese-gold, #f59e0b); }
+.step-item.completed .step-circle {
+  border-color: #10b981; background: rgba(16,185,129,0.15);
+  color: #10b981;
+}
+.step-item.completed .step-label { color: #10b981; }
+.step-connector {
+  width: 48px; height: 2px;
+  background: rgba(255,255,255,0.08);
+  flex-shrink: 0; margin: 0 2px;
+  transition: background 0.35s;
+  margin-bottom: 18px;
+}
+.step-connector.filled { background: #10b981; }
+
+/* ── GNSS satellite bars ─────────────────────────────────────── */
+.gnss-sat-bars { margin-top: 0.5rem; }
+.sat-grid {
+  display: flex; align-items: flex-end; gap: 3px;
+  height: 48px; padding: 4px 0;
+}
+.sat-col {
+  display: flex; flex-direction: column; align-items: center;
+  flex: 1; gap: 2px;
+}
+.sat-bar-bg {
+  width: 100%; height: 38px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  display: flex; align-items: flex-end; overflow: hidden;
+}
+.sat-bar-fill {
+  width: 100%; border-radius: 3px;
+  transition: height 0.6s ease, background 0.6s ease;
+}
+.sat-bar-snr {
+  font-size: 7px; color: rgba(255,255,255,0.3);
+  font-family: monospace;
+}
+
+/* ── Map container ──────────────────────────────────────────── */
+.map-container {
+  position: relative;
+  flex: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+.map-hud-alert {
+  position: absolute; top: 10px; left: 10px; right: 10px;
+  z-index: 500; pointer-events: none;
+}
+.map-hud-alert > * { pointer-events: all; }
+.alert-card {
+  background: rgba(239,68,68,0.12);
+  border: 1px solid rgba(239,68,68,0.4);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  display: flex; align-items: center; gap: 0.75rem;
+  color: #fca5a5; backdrop-filter: blur(8px);
+}
+.map-hud-controls {
+  position: absolute; bottom: 10px; left: 10px;
+  z-index: 500;
+  display: flex; gap: 0.5rem; flex-wrap: wrap;
+}
+
+/* ── Layer toggle active state ──────────────────────────────── */
+.btn-outline.active {
+  background: rgba(245,158,11,0.15);
+  border-color: var(--cheese-gold, #f59e0b);
+  color: var(--cheese-gold, #f59e0b);
+}
+
+/* ── AI Title Vectorizer ────────────────────────────────────── */
+.vectorizer-loading {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.75rem; border-radius: 6px;
+  background: rgba(245,158,11,0.06);
+  border: 1px solid rgba(245,158,11,0.2);
+}
+.vectorizer-result {
+  border: 1px solid rgba(16,185,129,0.3);
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: rgba(16,185,129,0.05);
+}
+.v-result-head {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.8rem; font-weight: 700; margin-bottom: 0.5rem;
+}
+.v-meta {
+  display: flex; flex-wrap: wrap; gap: 0.4rem;
+  font-size: 0.7rem; color: rgba(255,255,255,0.5);
+  margin-bottom: 0.5rem;
+}
+.v-meta span { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; }
+.v-coords { display: flex; flex-direction: column; gap: 3px; }
+.v-coord-row {
+  display: flex; gap: 0.5rem; font-size: 0.7rem; font-family: monospace;
+  padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+/* ── My Lots cards ──────────────────────────────────────────── */
+.my-lot-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.4rem;
+  transition: border-color 0.2s;
+}
+.my-lot-card:hover { border-color: rgba(245,158,11,0.3); }
+
+/* ── Toast notifications ────────────────────────────────────── */
+#toast-container {
+  position: fixed; bottom: 1.25rem; right: 1.25rem;
+  z-index: 9999;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  pointer-events: none;
+}
+.toast {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  font-size: 0.82rem; font-weight: 500;
+  min-width: 220px; max-width: 340px;
+  backdrop-filter: blur(12px);
+  border: 1px solid transparent;
+  transform: translateX(120%);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s;
+  opacity: 0; pointer-events: all;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.toast.toast-show { transform: translateX(0); opacity: 1; }
+.toast-success { background: rgba(16,185,129,0.18); border-color: rgba(16,185,129,0.35); color: #6ee7b7; }
+.toast-error   { background: rgba(239,68,68,0.18);  border-color: rgba(239,68,68,0.35);  color: #fca5a5; }
+.toast-warning { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.35); color: #fcd34d; }
+.toast-info    { background: rgba(59,130,246,0.18); border-color: rgba(59,130,246,0.35); color: #93c5fd; }
+
+/* ── Modals ─────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 8000;
+  background: rgba(0,0,0,0.72);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.modal-overlay.hidden { display: none; }
+.modal-box {
+  background: rgba(14, 14, 28, 0.98);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 1.5rem;
+  width: 100%; max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+}
+.modal-header {
+  display: flex; align-items: center; gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.modal-header h2 { font-size: 1.1rem; font-weight: 700; margin: 0; }
+
+/* ── TX Receipt ─────────────────────────────────────────────── */
+.receipt-grid { display: flex; flex-direction: column; gap: 0.5rem; }
+.receipt-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.82rem; padding: 0.4rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.receipt-row span { color: rgba(255,255,255,0.45); }
+
+/* ── Onboarding steps ───────────────────────────────────────── */
+.onboarding-steps { display: flex; flex-direction: column; gap: 0.6rem; }
+.ob-step {
+  display: flex; align-items: flex-start; gap: 0.75rem;
+  font-size: 0.82rem; color: rgba(255,255,255,0.7);
+}
+.ob-num {
+  width: 24px; height: 24px; flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(245,158,11,0.2);
+  border: 1px solid rgba(245,158,11,0.5);
+  color: var(--cheese-gold, #f59e0b);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700;
+}
+.ob-step strong { color: #fff; display: block; }
+.ob-step span { font-size: 0.77rem; color: rgba(255,255,255,0.5); }
+
+/* ── Encroachment resolution modal buttons ──────────────────── */
+#encroachment-modal .btn-outline {
+  transition: background 0.2s, border-color 0.2s;
+}
+#encroachment-modal .btn-outline:hover { background: rgba(255,255,255,0.06); }
+
+/* ── Consensus row ──────────────────────────────────────────── */
+.consensus-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  gap: 0.5rem;
+}
+
+/* ── Status pill variants ───────────────────────────────────── */
+.status-pill.partial {
+  background: rgba(245,158,11,0.12);
+  color: #fcd34d;
+  border: 1px solid rgba(245,158,11,0.3);
+}
+
+/* ── Legal footer ───────────────────────────────────────────── */
+.legal-footer {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: rgba(8,8,16,0.95);
+  border-top: 1px solid rgba(245,158,11,0.15);
+  padding: 0.4rem 1.5rem;
+  font-size: 0.68rem; color: rgba(255,255,255,0.35);
+  display: flex; align-items: center; gap: 0.5rem;
+  z-index: 200; backdrop-filter: blur(8px);
+}
+
+/* ── NCHEESE balance wrap ───────────────────────────────────── */
+#ncheese-balance-wrap { display: flex !important; }
+#ncheese-balance-wrap.hidden { display: none !important; }
+
+/* ── Workspace header ───────────────────────────────────────── */
+.workspace-header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 1rem;
+  padding: 0.75rem 1rem 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ── Scrollbar polish ───────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
+::-webkit-scrollbar-thumb { background: rgba(245,158,11,0.25); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(245,158,11,0.45); }

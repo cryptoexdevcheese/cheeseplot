@@ -1,289 +1,494 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CheesePlot | Sovereign P2P Geodetic Surveyor & Cadastre</title>
-    
-    <!-- Google Fonts & FontAwesome Icons -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Embedded Styles Link -->
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CheesePlot | Sovereign P2P Geodetic Surveyor & Cadastre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Leaflet Map -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style-additions.css">
 </head>
 <body>
 
-    <div class="app-container">
-        
-        <!-- SIDEBAR: Telemetry & Connections -->
-        <aside class="sidebar">
-            <div class="brand-section">
-                <i class="fa-solid fa-compass-drafting brand-logo"></i>
-                <div>
-                    <h1 class="brand-title">CheesePlot</h1>
-                    <span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Sovereign Land Ledger</span>
-                </div>
-            </div>
+<!-- ── TOAST CONTAINER ───────────────────────── -->
+<div id="toast-container"></div>
 
-            <!-- Wallet connection card -->
-            <div class="glass-panel" style="padding: 1rem;">
-                <div class="panel-section-title"><i class="fa-solid fa-wallet"></i> Web3 Wallet</div>
-                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.75rem;">
-                    <span class="text-muted">Account:</span>
-                    <span id="wallet-address-display" style="font-weight: 700;">No Wallet Connected</span>
-                </div>
-                <button id="btn-connect-wallet" class="btn-primary" style="width: 100%;"><i class="fa-brands fa-ethereum"></i> Connect Wallet</button>
-            </div>
+<!-- ── ONBOARDING MODAL ──────────────────────── -->
+<div id="onboarding-modal" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-header">
+      <i class="fa-solid fa-compass-drafting" style="color:var(--cheese-gold);font-size:1.5rem;"></i>
+      <h2>Welcome to CheesePlot</h2>
+    </div>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1.25rem;">
+      The sovereign P2P cadastral system for the Philippines. Here's how to register your lot:
+    </p>
+    <div class="onboarding-steps">
+      <div class="ob-step"><div class="ob-num">1</div><div><strong>Connect Rover</strong><br><span>Pair your Bluetooth GNSS rover for RTK-precision coordinates.</span></div></div>
+      <div class="ob-step"><div class="ob-num">2</div><div><strong>Stream NTRIP</strong><br><span>Connect to NAMRIA or a DePIN peer node for sub-centimetre corrections.</span></div></div>
+      <div class="ob-step"><div class="ob-num">3</div><div><strong>Plot Boundary</strong><br><span>Click the map to place nodes — or walk the boundary with your rover.</span></div></div>
+      <div class="ob-step"><div class="ob-num">4</div><div><strong>Collect Signatures</strong><br><span>Invite neighbors to co-sign the shared boundary on-chain.</span></div></div>
+      <div class="ob-step"><div class="ob-num">5</div><div><strong>Notarize</strong><br><span>Get Barangay LGU approval and Geodetic Surveyor verification.</span></div></div>
+      <div class="ob-step"><div class="ob-num">6</div><div><strong>Register</strong><br><span>Seal the parcel on the Sovereign Cadastral Ledger forever.</span></div></div>
+    </div>
+    <button id="btn-onboarding-close" class="btn-primary" style="width:100%;margin-top:1rem;">
+      <i class="fa-solid fa-rocket"></i> Let's Start
+    </button>
+  </div>
+</div>
 
-            <!-- Mobile SMS-Bridge simulated identity form -->
-            <div class="glass-panel" style="padding: 1rem;">
-                <div class="panel-section-title"><i class="fa-solid fa-mobile-screen"></i> SMS Signing Bridge</div>
-                <div class="form-group">
-                    <label>Citizen Verified Mobile Number</label>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <input type="text" id="sms-phone-number" class="form-input" placeholder="+63 917 123 4567" style="flex: 1;">
-                        <button id="btn-request-sms" class="btn-outline"><i class="fa-solid fa-key"></i> Verify</button>
-                    </div>
-                </div>
-                <div id="sms-otp-container" class="form-group hidden" style="margin-top: 0.5rem;">
-                    <label>Enter 6-Digit One-Time Code</label>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <input type="text" id="sms-otp-input" class="form-input" placeholder="123456" style="flex: 1; text-align: center; letter-spacing: 2px;">
-                        <button id="btn-verify-otp" class="btn-primary">Confirm</button>
-                    </div>
-                </div>
-            </div>
+<!-- ── TX RECEIPT MODAL ──────────────────────── -->
+<div id="tx-receipt-modal" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-header" style="color:var(--green-accent);">
+      <i class="fa-solid fa-circle-check" style="font-size:1.5rem;"></i>
+      <h2>Lot Registered On-Chain!</h2>
+    </div>
+    <div class="receipt-grid">
+      <div class="receipt-row"><span>Parcel ID</span><strong id="tx-receipt-parcel-id">—</strong></div>
+      <div class="receipt-row"><span>TX Hash</span><strong id="tx-receipt-hash" style="font-family:monospace;font-size:0.75rem;">—</strong></div>
+      <div class="receipt-row"><span>Block</span><strong id="tx-receipt-block">—</strong></div>
+      <div class="receipt-row"><span>Timestamp</span><strong id="tx-receipt-time">—</strong></div>
+    </div>
+    <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+      <a id="tx-explorer-link" href="#" target="_blank" class="btn-outline" style="flex:1;text-align:center;text-decoration:none;padding:0.5rem;">
+        <i class="fa-solid fa-arrow-up-right-from-square"></i> View on Explorer
+      </a>
+      <button id="btn-tx-receipt-close" class="btn-primary" style="flex:1;" onclick="document.getElementById('tx-receipt-modal').classList.add('hidden')">
+        <i class="fa-solid fa-xmark"></i> Close
+      </button>
+    </div>
+  </div>
+</div>
 
-            <!-- GNSS Rover Telemetry panel -->
-            <div class="glass-panel" style="padding: 1rem;">
-                <div class="panel-section-title"><i class="fa-solid fa-satellite"></i> Bluetooth GNSS Rover</div>
-                <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.8rem; margin-bottom: 0.75rem;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span class="text-muted">Device Link:</span>
-                        <span id="rover-link-status" class="status-pill disconnected">Disconnected</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span class="text-muted">RTK Precision Status:</span>
-                        <span id="rtk-precision-status" class="status-pill disconnected">No GNSS Data</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span class="text-muted">Satellites Tracked:</span>
-                        <span id="rover-sats-count" style="font-weight: 700;">0 / 32</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span class="text-muted">RMS Horizontal Error:</span>
-                        <span id="rover-rms-error" style="font-weight: 700; color: var(--red-alert);">0.00 m</span>
-                    </div>
-                </div>
-                <button id="btn-connect-rover" class="btn-outline" style="width: 100%; border-color: var(--cheese-gold); color: var(--cheese-gold);"><i class="fa-solid fa-bluetooth"></i> Connect External Rover</button>
-            </div>
+<!-- ── ENCROACHMENT RESOLUTION MODAL ─────────── -->
+<div id="encroachment-modal" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header" style="color:#ef4444;">
+      <i class="fa-solid fa-triangle-exclamation" style="font-size:1.5rem;"></i>
+      <h2>Boundary Encroachment</h2>
+    </div>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">
+      Your plotted boundary crosses into a registered neighbor parcel. Choose a resolution path:
+    </p>
+    <div style="display:flex;flex-direction:column;gap:0.5rem;">
+      <button id="btn-resolve-request-meeting" class="btn-outline" style="text-align:left;padding:0.75rem 1rem;">
+        <i class="fa-solid fa-handshake" style="color:var(--cheese-gold);margin-right:0.5rem;"></i>
+        <strong>Request Neighbor Meeting</strong><br>
+        <small style="color:var(--text-muted);">Send an on-chain meeting request to the neighbor wallet.</small>
+      </button>
+      <button id="btn-resolve-file-dispute" class="btn-outline" style="text-align:left;padding:0.75rem 1rem;">
+        <i class="fa-solid fa-gavel" style="color:#ef4444;margin-right:0.5rem;"></i>
+        <strong>File Boundary Dispute</strong><br>
+        <small style="color:var(--text-muted);">Submit a formal dispute to the Barangay Lupon.</small>
+      </button>
+      <button id="btn-resolve-adjust-boundary" class="btn-outline" style="text-align:left;padding:0.75rem 1rem;">
+        <i class="fa-solid fa-draw-polygon" style="color:var(--blue-accent);margin-right:0.5rem;"></i>
+        <strong>Adjust My Boundary</strong><br>
+        <small style="color:var(--text-muted);">Drag boundary nodes to correct the overlap.</small>
+      </button>
+    </div>
+    <button class="btn-outline" style="width:100%;margin-top:0.75rem;" onclick="document.getElementById('encroachment-modal').classList.add('hidden')">
+      Cancel
+    </button>
+  </div>
+</div>
 
-            <!-- AI Title Vectorizer (OCR Upload) -->
-            <div class="glass-panel" style="padding: 1rem;">
-                <div class="panel-section-title"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Title Vectorizer</div>
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label>Upload Land Title (TCT/OCT)</label>
-                    <div id="title-file-uploader" style="border: 2px dashed var(--border-glass); border-radius: 8px; padding: 1rem 0.5rem; text-align: center; cursor: pointer; transition: border-color 0.2s;" ondragover="event.preventDefault(); this.style.borderColor='var(--cheese-gold)';" ondragleave="this.style.borderColor='var(--border-glass)';" ondrop="event.preventDefault(); this.style.borderColor='var(--border-glass)';">
-                        <i class="fa-solid fa-cloud-arrow-up" style="font-size: 1.5rem; color: var(--cheese-gold); margin-bottom: 0.5rem; display: block;"></i>
-                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">Drag & drop image of paper title description</span>
-                    </div>
-                </div>
-            </div>
+<div class="app-container">
 
-            <!-- NTRIP Caster Settings card -->
-            <div class="glass-panel" style="padding: 1rem;">
-                <div class="panel-section-title"><i class="fa-solid fa-tower-broadcast"></i> NTRIP AGN Corrections</div>
-                <div class="form-group">
-                    <label>Correction Stream Caster</label>
-                    <select id="ntrip-caster-select" class="form-input" style="margin-bottom: 0.5rem;">
-                        <option value="government">NAMRIA AGN Government Base (Manila)</option>
-                        <option value="depin-manila">CHZ-MANILA-BASE-01 (DePIN Peer Node)</option>
-                        <option value="depin-cebu">CHZ-CEBU-BASE-04 (DePIN Peer Node)</option>
-                        <option value="depin-davao">CHZ-DAVAO-BASE-12 (DePIN Peer Node)</option>
-                    </select>
-                    <input type="text" id="ntrip-caster" class="form-input" value="agn.namria.gov.ph:2101" style="font-size: 0.7rem; color: var(--text-muted); background: rgba(0,0,0,0.15);" readonly>
-                </div>
-                <div class="form-group">
-                    <label>Survey Mountpoint</label>
-                    <input type="text" id="ntrip-mountpoint" class="form-input" value="MANILA_RTCM3">
-                </div>
-                <button id="btn-connect-ntrip" class="btn-outline" style="width: 100%;"><i class="fa-solid fa-plug"></i> Stream NAMRIA Corrections</button>
-                <div id="depin-node-rewards" class="hidden" style="margin-top: 0.5rem; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); border-radius: 6px; padding: 0.4rem; font-size: 0.7rem; text-align: center; color: var(--green-accent);">
-                    <i class="fa-solid fa-coins"></i> Active Stream: Earning NCHEESE base fee
-                </div>
-            </div>
-        </aside>
+  <!-- ── WORKFLOW STEPPER ──────────────────────── -->
+  <div class="workflow-stepper-bar">
+    <div id="workflow-stepper" class="workflow-stepper"></div>
+  </div>
 
-        <!-- MAIN CADASTRAL WORKSPACE -->
-        <main class="main-workspace">
-            <header class="workspace-header">
-                <div>
-                    <h2 style="font-size: 1.1rem; font-weight: 700;">Sovereign Land Plotter Workspace</h2>
-                    <p style="font-size: 0.75rem; color: var(--text-muted);">Use the mapping canvas below to plot property boundaries or stream live GNSS coordinates.</p>
-                </div>
-                <div style="display: flex; gap: 0.5rem;">
-                    <button id="btn-toggle-grid" class="btn-outline"><i class="fa-solid fa-grid-4"></i> Grid Snap</button>
-                    <button id="btn-clear-plot" class="btn-outline" style="border-color: rgba(239,68,68,0.3); color: var(--red-alert);"><i class="fa-solid fa-trash-can"></i> Clear Plot</button>
-                </div>
-            </header>
-
-            <div class="map-container">
-                <!-- Encroachment HUD warnings -->
-                <div class="map-hud-alert">
-                    <div id="encroachment-warning" class="alert-card hidden">
-                        <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.25rem;"></i>
-                        <div>
-                            <strong style="display: block;">Boundary Encroachment Warning!</strong>
-                            <span id="encroachment-desc" style="font-size: 0.75rem;">Your plotted points cross into a registered neighbor's property line.</span>
-                        </div>
-                    </div>
-                </div>
-
-                <canvas id="cadastral-canvas"></canvas>
-
-                <!-- Floating map canvas utilities -->
-                <div class="map-hud-controls">
-                    <button id="btn-simulate-rover-track" class="btn-primary"><i class="fa-solid fa-person-walking"></i> Walk Boundary (RTK Rover)</button>
-                    <button id="btn-mock-overlap" class="btn-outline"><i class="fa-solid fa-circle-nodes"></i> Load Neighbor Lot Mock</button>
-                </div>
-            </div>
-        </main>
-
-        <!-- RIGHT PANEL: Calculations & Consensus Sign-offs -->
-        <aside class="dashboard-panel">
-            <div class="glass-panel">
-                <div class="panel-section-title"><i class="fa-solid fa-square-poll-vertical"></i> Lot Parcel Statistics</div>
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <div id="metric-area" class="metric-value">0.00</div>
-                        <div class="metric-label">Area (sqm)</div>
-                    </div>
-                    <div class="metric-card">
-                        <div id="metric-perimeter" class="metric-value">0.00</div>
-                        <div class="metric-label">Perimeter (m)</div>
-                    </div>
-                </div>
-
-                <!-- Subdivision Mode controls -->
-                <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
-                    <button id="btn-subdivide-mode" class="btn-outline" style="flex: 1; font-size: 0.75rem; border-color: var(--blue-accent); color: var(--blue-accent);" disabled><i class="fa-solid fa-scissors"></i> Subdivide Lot</button>
-                    <button id="btn-cancel-subdivide" class="btn-outline hidden" style="flex: 1; font-size: 0.75rem; border-color: var(--red-alert); color: var(--red-alert);"><i class="fa-solid fa-xmark"></i> Cancel Split</button>
-                </div>
-
-                <!-- Sibling split layout panel -->
-                <div id="subdivision-sibling-panel" class="hidden" style="margin-top: 0.75rem; background: rgba(59,130,246,0.06); border: 1px dashed var(--blue-accent); border-radius: 8px; padding: 0.75rem;">
-                    <div style="font-size: 0.75rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--blue-accent);"><i class="fa-solid fa-users"></i> Sibling Subdivision Consensus</div>
-                    
-                    <div class="form-group" style="margin-bottom: 0.5rem;">
-                        <label style="font-size: 0.65rem;">Sibling Wallet #1 Address</label>
-                        <div style="display: flex; gap: 0.25rem;">
-                            <input type="text" id="sibling-1-address" class="form-input" style="font-size: 0.7rem; font-family: monospace;" placeholder="0x..." value="0x712A1cbA607C60D95F27088c80Abbbd1f53d33Fe">
-                            <button id="btn-sign-sibling-1" class="btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem;">Sign</button>
-                        </div>
-                    </div>
-
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.65rem;">Sibling Wallet #2 Address</label>
-                        <div style="display: flex; gap: 0.25rem;">
-                            <input type="text" id="sibling-2-address" class="form-input" style="font-size: 0.7rem; font-family: monospace;" placeholder="0x..." value="0x42145465BcfF94FE53c7a362C0B0C462C07df20b">
-                            <button id="btn-sign-sibling-2" class="btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem;">Sign</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Coordinates boundary listing -->
-                <div class="form-group" style="margin-top: 1rem;">
-                    <label>Boundary Nodes Coordinates (WGS84)</label>
-                    <div id="coordinates-log-list" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 8px; padding: 0.5rem; height: 110px; overflow-y: auto; font-family: monospace; font-size: 0.7rem; display: flex; flex-direction: column; gap: 0.25rem;">
-                        <span class="text-muted" style="text-align: center; margin-top: 2rem;">No boundary points added yet.</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Neighbor Consensus Portal -->
-            <div class="glass-panel consensus-card">
-                <div class="panel-section-title" style="color: var(--blue-accent);"><i class="fa-solid fa-signature"></i> Neighbor Alignment Consensus</div>
-                <p style="font-size: 0.75rem; color: var(--text-muted);">Invite neighbors to sign the shared boundary line to seal P2P agreement on-chain.</p>
-                
-                <div class="form-group" style="margin-top: 0.75rem;">
-                    <label>Neighbor Wallets (1 per line)</label>
-                    <textarea id="neighbor-wallets-input" class="form-input" rows="3" placeholder="0x..." style="resize: none; font-size: 0.75rem; font-family: monospace;"></textarea>
-                </div>
-
-                <div class="consensus-list" id="neighbor-signatures-list">
-                    <span class="text-muted" style="font-size: 0.75rem; text-align: center;">Add neighbors above to configure consensus signoff slots.</span>
-                </div>
-            </div>
-
-            <!-- Official Verifications Card -->
-            <div class="glass-panel" style="border-left: 4px solid var(--green-accent);">
-                <div class="panel-section-title" style="color: var(--green-accent);"><i class="fa-solid fa-stamp"></i> Cadastral Notarizations</div>
-                
-                <!-- Barangay Notarization -->
-                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8rem; margin-bottom: 0.5rem; border: 1px solid var(--border-glass);">
-                    <div>
-                        <div class="role-lbl">Barangay LGU Approval</div>
-                        <div id="lgu-notary-address" class="text-muted" style="font-size: 0.65rem;">Not Approved</div>
-                    </div>
-                    <button id="btn-lgu-approve" class="btn-primary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;"><i class="fa-solid fa-building-flag"></i> Notarize</button>
-                </div>
-
-                <!-- Geodetic Surveyor Notarization -->
-                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8rem; border: 1px solid var(--border-glass);">
-                    <div>
-                        <div class="role-lbl">Geodetic Surveyor Verify</div>
-                        <div id="surveyor-notary-address" class="text-muted" style="font-size: 0.65rem;">Not Verified</div>
-                    </div>
-                    <button id="btn-surveyor-verify" class="btn-primary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem;"><i class="fa-solid fa-clipboard-check"></i> Stamp</button>
-                </div>
-            </div>
-
-            <button id="btn-submit-registry" class="btn-primary" style="width: 100%; margin-top: auto;" disabled><i class="fa-solid fa-cloud-arrow-up"></i> Register Lot on Blockchain</button>
-        </aside>
-
-        <!-- CADASTRAL LEDGER DISCOVERY SYSTEM -->
-        <footer class="bottom-explorer">
-            <div class="explorer-header">
-                <div class="explorer-title">
-                    <i class="fa-solid fa-globe text-gold"></i>
-                    Sovereign Cadastral Ledger Explorer
-                </div>
-                <div class="form-group" style="margin-bottom: 0; flex-direction: row; align-items: center; gap: 0.5rem;">
-                    <label style="white-space: nowrap; margin-bottom: 0;">Search Spatial Hash:</label>
-                    <input type="text" id="ledger-search-input" class="form-input" placeholder="Enter coordinates hash..." style="width: 250px; padding: 0.35rem 0.5rem;">
-                </div>
-            </div>
-
-            <div class="explorer-table-container">
-                <table class="explorer-table">
-                    <thead>
-                        <tr>
-                            <th>Parcel ID</th>
-                            <th>Spatial Boundary Hash</th>
-                            <th>Total Surface Area</th>
-                            <th>Claimant Address</th>
-                            <th>Neighbors Signoff</th>
-                            <th>Surveyor stamp</th>
-                            <th>Barangay seal</th>
-                            <th>Precision Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ledger-history-rows">
-                        <tr>
-                            <td colspan="8" class="text-muted" style="text-align: center; padding: 2rem;">No cadastral block records verified yet. Start plotting to seal the first lot.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </footer>
+  <!-- ══════════════════════════════════════════════
+       SIDEBAR
+  ═══════════════════════════════════════════════ -->
+  <aside class="sidebar">
+    <div class="brand-section">
+      <i class="fa-solid fa-compass-drafting brand-logo"></i>
+      <div>
+        <h1 class="brand-title">CheesePlot</h1>
+        <span style="font-size:0.65rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;">Sovereign Land Ledger</span>
+      </div>
     </div>
 
-    <!-- Web3 Ethers.js library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.16.0/ethers.umd.min.js"></script>
-    <!-- App Logic Link -->
-    <script src="app.js"></script>
+    <!-- Wallet -->
+    <div class="glass-panel" style="padding:1rem;">
+      <div class="panel-section-title"><i class="fa-solid fa-wallet"></i> Web3 Wallet</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.8rem;margin-bottom:0.5rem;">
+        <span class="text-muted">Account:</span>
+        <span id="wallet-address-display" style="font-weight:700;">No Wallet Connected</span>
+      </div>
+      <div id="ncheese-balance-wrap" class="hidden" style="display:flex;align-items:center;justify-content:space-between;font-size:0.8rem;margin-bottom:0.75rem;">
+        <span class="text-muted"><i class="fa-solid fa-coins" style="color:var(--cheese-gold);"></i> NCHEESE:</span>
+        <span id="ncheese-balance" style="font-weight:700;color:var(--cheese-gold);">0.00</span>
+      </div>
+      <button id="btn-connect-wallet" class="btn-primary" style="width:100%;"><i class="fa-brands fa-ethereum"></i> Connect Wallet</button>
+    </div>
+
+    <!-- SMS Bridge -->
+    <div class="glass-panel" style="padding:1rem;">
+      <div class="panel-section-title"><i class="fa-solid fa-mobile-screen"></i> SMS Signing Bridge</div>
+      <div class="form-group">
+        <label>Citizen Verified Mobile Number</label>
+        <div style="display:flex;gap:0.5rem;">
+          <input type="text" id="sms-phone-number" class="form-input" placeholder="+63 917 123 4567" style="flex:1;">
+          <button id="btn-request-sms" class="btn-outline"><i class="fa-solid fa-key"></i> Verify</button>
+        </div>
+      </div>
+      <div id="sms-otp-container" class="form-group hidden" style="margin-top:0.5rem;">
+        <label>Enter 6-Digit One-Time Code</label>
+        <div style="display:flex;gap:0.5rem;">
+          <input type="text" id="sms-otp-input" class="form-input" placeholder="123456" style="flex:1;text-align:center;letter-spacing:2px;">
+          <button id="btn-verify-otp" class="btn-primary">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- GNSS Rover -->
+    <div class="glass-panel" style="padding:1rem;">
+      <div class="panel-section-title"><i class="fa-solid fa-satellite"></i> Bluetooth GNSS Rover</div>
+      <div style="display:flex;flex-direction:column;gap:0.5rem;font-size:0.8rem;margin-bottom:0.75rem;">
+        <div style="display:flex;justify-content:space-between;">
+          <span class="text-muted">Device Link:</span>
+          <span id="rover-link-status" class="status-pill disconnected">Disconnected</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span class="text-muted">RTK Status:</span>
+          <span id="rtk-precision-status" class="status-pill disconnected">No GNSS Data</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span class="text-muted">Satellites:</span>
+          <span id="rover-sats-count" style="font-weight:700;">0 / 32</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span class="text-muted">RMS Horiz. Error:</span>
+          <span id="rover-rms-error" style="font-weight:700;color:var(--red-alert);">0.0000 m</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span class="text-muted">Age of Corrections:</span>
+          <span id="gnss-age-of-corrections" style="font-weight:700;color:var(--text-muted);">—</span>
+        </div>
+      </div>
+      <!-- Satellite signal bars -->
+      <div id="gnss-sat-bars" class="gnss-sat-bars"></div>
+      <button id="btn-connect-rover" class="btn-outline" style="width:100%;margin-top:0.75rem;border-color:var(--cheese-gold);color:var(--cheese-gold);">
+        <i class="fa-solid fa-bluetooth"></i> Connect External Rover
+      </button>
+    </div>
+
+    <!-- AI Title Vectorizer -->
+    <div class="glass-panel" style="padding:1rem;">
+      <div class="panel-section-title"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Title Vectorizer</div>
+      <div class="form-group" style="margin-bottom:0.5rem;">
+        <label>Upload Land Title (TCT / OCT / PDF)</label>
+        <div id="title-file-uploader"
+          style="border:2px dashed var(--border-glass);border-radius:8px;padding:1rem 0.5rem;text-align:center;cursor:pointer;transition:border-color 0.2s;"
+          ondragover="event.preventDefault();this.style.borderColor='var(--cheese-gold)';"
+          ondragleave="this.style.borderColor='var(--border-glass)';"
+          ondrop="event.preventDefault();this.style.borderColor='var(--border-glass)';">
+          <i class="fa-solid fa-cloud-arrow-up" style="font-size:1.5rem;color:var(--cheese-gold);margin-bottom:0.5rem;display:block;"></i>
+          <span style="font-size:0.75rem;color:var(--text-muted);display:block;">Drag & drop image or PDF of paper title</span>
+          <span style="font-size:0.65rem;color:var(--text-muted);display:block;margin-top:2px;">JPG, PNG, PDF supported</span>
+        </div>
+      </div>
+      <!-- Vectorizer output panel (hidden until file uploaded) -->
+      <div id="title-vectorizer-output" class="hidden"></div>
+    </div>
+
+    <!-- NTRIP -->
+    <div class="glass-panel" style="padding:1rem;">
+      <div class="panel-section-title"><i class="fa-solid fa-tower-broadcast"></i> NTRIP AGN Corrections</div>
+      <div class="form-group">
+        <label>Correction Stream Caster</label>
+        <select id="ntrip-caster-select" class="form-input" style="margin-bottom:0.5rem;">
+          <option value="government">NAMRIA AGN Government Base (Manila)</option>
+          <option value="depin-manila">CHZ-MANILA-BASE-01 (DePIN Peer Node)</option>
+          <option value="depin-cebu">CHZ-CEBU-BASE-04 (DePIN Peer Node)</option>
+          <option value="depin-davao">CHZ-DAVAO-BASE-12 (DePIN Peer Node)</option>
+        </select>
+        <input type="text" id="ntrip-caster" class="form-input" value="agn.namria.gov.ph:2101"
+          style="font-size:0.7rem;color:var(--text-muted);background:rgba(0,0,0,0.15);" readonly>
+      </div>
+      <div class="form-group">
+        <label>Survey Mountpoint</label>
+        <input type="text" id="ntrip-mountpoint" class="form-input" value="MANILA_RTCM3">
+      </div>
+      <button id="btn-connect-ntrip" class="btn-outline" style="width:100%;">
+        <i class="fa-solid fa-plug"></i> Stream NAMRIA Corrections
+      </button>
+      <div id="depin-node-rewards" class="hidden"
+        style="margin-top:0.5rem;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:6px;padding:0.4rem;font-size:0.7rem;text-align:center;color:var(--green-accent);">
+        <i class="fa-solid fa-coins"></i> Active Stream: Earning NCHEESE base fee
+        <span id="ntrip-packet-counter" style="margin-left:0.5rem;font-family:monospace;"></span>
+      </div>
+    </div>
+
+    <!-- My Lots Dashboard -->
+    <div class="glass-panel" style="padding:1rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+        <div class="panel-section-title" style="margin-bottom:0;"><i class="fa-solid fa-layer-group"></i> My Lots</div>
+        <button id="btn-my-lots-toggle" class="btn-outline" style="padding:0.2rem 0.5rem;font-size:0.7rem;">
+          <i class="fa-solid fa-chevron-down"></i>
+        </button>
+      </div>
+      <div id="my-lots-panel">
+        <div id="my-lots-list">
+          <p class="text-muted" style="font-size:0.75rem;text-align:center;">No lots registered yet.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fee Transparency -->
+    <div class="glass-panel" style="padding:1rem;">
+      <div class="panel-section-title"><i class="fa-solid fa-circle-info"></i> Fees & Tokenomics</div>
+      <div style="font-size:0.75rem;display:flex;flex-direction:column;gap:0.4rem;">
+        <div style="display:flex;justify-content:space-between;">
+          <span class="text-muted">Lot Registration</span><strong style="color:var(--cheese-gold);">5 NCHEESE</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span class="text-muted">Subdivision</span><strong style="color:var(--cheese-gold);">2 NCHEESE</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span class="text-muted">NTRIP Base Reward</span><strong style="color:var(--green-accent);">+0.001 / 3s</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span class="text-muted">Neighbor Sign Reward</span><strong style="color:var(--green-accent);">+0.5 NCHEESE</strong>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ══════════════════════════════════════════════
+       MAIN WORKSPACE
+  ═══════════════════════════════════════════════ -->
+  <main class="main-workspace">
+    <header class="workspace-header">
+      <div>
+        <h2 style="font-size:1.1rem;font-weight:700;">Sovereign Land Plotter Workspace</h2>
+        <p style="font-size:0.75rem;color:var(--text-muted);">Click the map to place boundary nodes. Right-click a node to delete it. Drag to reposition.</p>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <!-- Map layer toggles -->
+        <button id="btn-layer-topo" class="btn-outline active" title="Street/Topo view">
+          <i class="fa-solid fa-map"></i> Topo
+        </button>
+        <button id="btn-layer-satellite" class="btn-outline" title="Satellite imagery">
+          <i class="fa-solid fa-satellite-dish"></i> Satellite
+        </button>
+        <button id="btn-toggle-grid" class="btn-outline"><i class="fa-solid fa-grid-4"></i> Grid Snap</button>
+        <button id="btn-undo-point" class="btn-outline" title="Undo last boundary node">
+          <i class="fa-solid fa-rotate-left"></i> Undo
+        </button>
+        <button id="btn-clear-plot" class="btn-outline" style="border-color:rgba(239,68,68,0.3);color:var(--red-alert);">
+          <i class="fa-solid fa-trash-can"></i> Clear
+        </button>
+      </div>
+    </header>
+
+    <div class="map-container">
+      <!-- Encroachment HUD -->
+      <div class="map-hud-alert">
+        <div id="encroachment-warning" class="alert-card hidden">
+          <i class="fa-solid fa-triangle-exclamation" style="font-size:1.25rem;"></i>
+          <div>
+            <strong style="display:block;">Boundary Encroachment Warning!</strong>
+            <span id="encroachment-desc" style="font-size:0.75rem;">Your plotted points cross into a registered neighbor's property line.</span>
+          </div>
+          <button id="btn-resolve-encroachment" class="btn-outline" style="padding:0.3rem 0.6rem;font-size:0.75rem;border-color:#ef4444;color:#ef4444;white-space:nowrap;">
+            <i class="fa-solid fa-gavel"></i> Resolve
+          </button>
+        </div>
+      </div>
+
+      <!-- THE MAP (replaces canvas) -->
+      <div id="map"></div>
+
+      <!-- Map HUD controls -->
+      <div class="map-hud-controls">
+        <button id="btn-simulate-rover-track" class="btn-primary">
+          <i class="fa-solid fa-person-walking"></i> Walk Boundary (RTK Rover)
+        </button>
+        <button id="btn-mock-overlap" class="btn-outline">
+          <i class="fa-solid fa-circle-nodes"></i> Load Neighbor Lot Mock
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ══════════════════════════════════════════════
+       RIGHT DASHBOARD PANEL
+  ═══════════════════════════════════════════════ -->
+  <aside class="dashboard-panel">
+
+    <!-- Parcel Stats -->
+    <div class="glass-panel">
+      <div class="panel-section-title"><i class="fa-solid fa-square-poll-vertical"></i> Lot Parcel Statistics</div>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div id="metric-area" class="metric-value">0.00</div>
+          <div class="metric-label">Area (sqm)</div>
+        </div>
+        <div class="metric-card">
+          <div id="metric-perimeter" class="metric-value">0.00</div>
+          <div class="metric-label">Perimeter (m)</div>
+        </div>
+      </div>
+
+      <!-- Subdivision controls -->
+      <div style="display:flex;gap:0.5rem;margin-top:0.75rem;">
+        <button id="btn-subdivide-mode" class="btn-outline" style="flex:1;font-size:0.75rem;border-color:var(--blue-accent);color:var(--blue-accent);" disabled>
+          <i class="fa-solid fa-scissors"></i> Subdivide Lot
+        </button>
+        <button id="btn-cancel-subdivide" class="btn-outline hidden" style="flex:1;font-size:0.75rem;border-color:var(--red-alert);color:var(--red-alert);">
+          <i class="fa-solid fa-xmark"></i> Cancel Split
+        </button>
+      </div>
+
+      <!-- Sibling subdivision panel -->
+      <div id="subdivision-sibling-panel" class="hidden" style="margin-top:0.75rem;background:rgba(59,130,246,0.06);border:1px dashed var(--blue-accent);border-radius:8px;padding:0.75rem;">
+        <div style="font-size:0.75rem;font-weight:700;margin-bottom:0.5rem;color:var(--blue-accent);"><i class="fa-solid fa-users"></i> Sibling Subdivision Consensus</div>
+        <div class="form-group" style="margin-bottom:0.5rem;">
+          <label style="font-size:0.65rem;">Sibling Wallet #1 Address</label>
+          <div style="display:flex;gap:0.25rem;">
+            <input type="text" id="sibling-1-address" class="form-input" style="font-size:0.7rem;font-family:monospace;" placeholder="0x..." value="0x712A1cbA607C60D95F27088c80Abbbd1f53d33Fe">
+            <button id="btn-sign-sibling-1" class="btn-primary" style="padding:0.25rem 0.5rem;font-size:0.7rem;">Sign</button>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label style="font-size:0.65rem;">Sibling Wallet #2 Address</label>
+          <div style="display:flex;gap:0.25rem;">
+            <input type="text" id="sibling-2-address" class="form-input" style="font-size:0.7rem;font-family:monospace;" placeholder="0x..." value="0x42145465BcfF94FE53c7a362C0B0C462C07df20b">
+            <button id="btn-sign-sibling-2" class="btn-primary" style="padding:0.25rem 0.5rem;font-size:0.7rem;">Sign</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Coordinates log -->
+      <div class="form-group" style="margin-top:1rem;">
+        <label>Boundary Nodes (WGS84)</label>
+        <div id="coordinates-log-list" style="background:rgba(0,0,0,0.3);border:1px solid var(--border-glass);border-radius:8px;padding:0.5rem;height:110px;overflow-y:auto;font-family:monospace;font-size:0.7rem;display:flex;flex-direction:column;gap:0.25rem;">
+          <span class="text-muted" style="text-align:center;margin-top:2rem;">No boundary points added yet.</span>
+        </div>
+      </div>
+
+      <!-- GIS Export -->
+      <div style="margin-top:0.75rem;">
+        <label style="font-size:0.7rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:0.4rem;">Export Boundary Data</label>
+        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+          <button id="btn-export-geojson" class="btn-outline" style="font-size:0.7rem;padding:0.3rem 0.6rem;flex:1;">
+            <i class="fa-solid fa-download"></i> GeoJSON
+          </button>
+          <button id="btn-export-kml" class="btn-outline" style="font-size:0.7rem;padding:0.3rem 0.6rem;flex:1;">
+            <i class="fa-solid fa-download"></i> KML
+          </button>
+          <button id="btn-download-certificate" class="btn-outline" style="font-size:0.7rem;padding:0.3rem 0.6rem;flex:1;border-color:var(--cheese-gold);color:var(--cheese-gold);">
+            <i class="fa-solid fa-file-pdf"></i> Certificate
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Neighbor Consensus -->
+    <div class="glass-panel consensus-card">
+      <div class="panel-section-title" style="color:var(--blue-accent);"><i class="fa-solid fa-signature"></i> Neighbor Alignment Consensus</div>
+      <p style="font-size:0.75rem;color:var(--text-muted);">Invite neighbors to sign the shared boundary line to seal P2P agreement on-chain.</p>
+      <div class="form-group" style="margin-top:0.75rem;">
+        <label>Neighbor Wallets (1 per line)</label>
+        <textarea id="neighbor-wallets-input" class="form-input" rows="3" placeholder="0x..." style="resize:none;font-size:0.75rem;font-family:monospace;"></textarea>
+      </div>
+      <div class="consensus-list" id="neighbor-signatures-list">
+        <span class="text-muted" style="font-size:0.75rem;text-align:center;">Add neighbors above to configure consensus signoff slots.</span>
+      </div>
+    </div>
+
+    <!-- Notarizations -->
+    <div class="glass-panel" style="border-left:4px solid var(--green-accent);">
+      <div class="panel-section-title" style="color:var(--green-accent);"><i class="fa-solid fa-stamp"></i> Cadastral Notarizations</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.2);padding:0.5rem 0.75rem;border-radius:6px;font-size:0.8rem;margin-bottom:0.5rem;border:1px solid var(--border-glass);">
+        <div>
+          <div class="role-lbl">Barangay LGU Approval</div>
+          <div id="lgu-notary-address" class="text-muted" style="font-size:0.65rem;">Not Approved</div>
+        </div>
+        <button id="btn-lgu-approve" class="btn-primary" style="padding:0.35rem 0.65rem;font-size:0.75rem;">
+          <i class="fa-solid fa-building-flag"></i> Notarize
+        </button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.2);padding:0.5rem 0.75rem;border-radius:6px;font-size:0.8rem;border:1px solid var(--border-glass);">
+        <div>
+          <div class="role-lbl">Geodetic Surveyor Verify</div>
+          <div id="surveyor-notary-address" class="text-muted" style="font-size:0.65rem;">Not Verified</div>
+        </div>
+        <button id="btn-surveyor-verify" class="btn-primary" style="padding:0.35rem 0.65rem;font-size:0.75rem;">
+          <i class="fa-solid fa-clipboard-check"></i> Stamp
+        </button>
+      </div>
+    </div>
+
+    <button id="btn-submit-registry" class="btn-primary" style="width:100%;margin-top:auto;" disabled>
+      <i class="fa-solid fa-cloud-arrow-up"></i> Register Lot on Blockchain
+    </button>
+
+  </aside>
+
+  <!-- ══════════════════════════════════════════════
+       LEDGER EXPLORER
+  ═══════════════════════════════════════════════ -->
+  <footer class="bottom-explorer">
+    <div class="explorer-header">
+      <div class="explorer-title">
+        <i class="fa-solid fa-globe text-gold"></i>
+        Sovereign Cadastral Ledger Explorer
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <label style="white-space:nowrap;font-size:0.75rem;color:var(--text-muted);">Search:</label>
+        <input type="text" id="ledger-search-input" class="form-input" placeholder="Parcel ID, owner, hash…" style="width:220px;padding:0.35rem 0.5rem;">
+      </div>
+    </div>
+    <div class="explorer-table-container">
+      <table class="explorer-table">
+        <thead>
+          <tr>
+            <th>Parcel ID</th>
+            <th>Spatial Boundary Hash</th>
+            <th>Total Surface Area</th>
+            <th>Claimant Address</th>
+            <th>Neighbors Signoff</th>
+            <th>Surveyor stamp</th>
+            <th>Barangay seal</th>
+            <th>Precision Status</th>
+          </tr>
+        </thead>
+        <tbody id="ledger-history-rows">
+          <tr>
+            <td colspan="8" class="text-muted" style="text-align:center;padding:2rem;">
+              No cadastral block records verified yet. Start plotting to seal the first lot.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </footer>
+
+</div><!-- /.app-container -->
+
+<!-- Legal footer -->
+<div class="legal-footer">
+  <i class="fa-solid fa-triangle-exclamation" style="color:var(--cheese-gold);"></i>
+  <span>CheesePlot is a sovereign cadastral tool. On-chain records do not automatically constitute legal title under Philippine law (RA 11057, PD 1529). Always consult a licensed Geodetic Engineer and the Registry of Deeds.</span>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.16.0/ethers.umd.min.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
