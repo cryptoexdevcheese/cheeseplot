@@ -1,7 +1,7 @@
 {
-  "name": "cheese-plot",
+  "name": "blockchain-surveyor",
   "version": "1.0.0",
-  "description": "CheesePlot - Sovereign P2P Geodetic Surveyor & Cadastre",
+  "description": "Blockchain Surveyor - Sovereign P2P Geodetic Surveyor & Cadastre",
   "main": "app.js",
   "scripts": {
     "compile": "npx hardhat compile"

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-contract CheesePlot {
+contract BlockchainSurveyor {
     struct LotRecord {
         uint256 id;
         string spatialHash;     // SHA-256 of coordinates
@@ -14,6 +14,7 @@ contract CheesePlot {
         bool isVerified;
     }
 
+    address public admin;
     uint256 public lotCount;
     mapping(uint256 => LotRecord) public lots;
     mapping(string => bool) public spatialHashExists;
@@ -23,14 +24,52 @@ contract CheesePlot {
     // lotId => list of neighbors required to sign
     mapping(uint256 => address[]) public requiredNeighbors;
 
+    // Authorized Role whitelists
+    mapping(address => bool) public authorizedSurveyors;
+    mapping(address => bool) public authorizedLGUs;
+
     event LotRegistered(uint256 indexed id, string indexed spatialHash, address indexed owner, uint256 area);
     event BoundarySigned(uint256 indexed id, address indexed neighbor);
     event SurveyorVerified(uint256 indexed id, address indexed surveyor);
     event LGUApproved(uint256 indexed id, address indexed LGU);
+    event RoleAuthorizationChanged(string role, address indexed account, bool status);
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can call this");
+        _;
+    }
+
+    modifier onlyAuthorizedSurveyor() {
+        require(authorizedSurveyors[msg.sender], "Not an authorized Geodetic Surveyor");
+        _;
+    }
+
+    modifier onlyAuthorizedLGU() {
+        require(authorizedLGUs[msg.sender], "Not an authorized LGU official");
+        _;
+    }
 
     modifier onlyLotOwner(uint256 _id) {
         require(lots[_id].owner == msg.sender, "Only the lot owner can modify");
         _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+        // Authorize deployer by default for easy local sandbox test setups
+        authorizedSurveyors[msg.sender] = true;
+        authorizedLGUs[msg.sender] = true;
+    }
+
+    // Role management
+    function setSurveyorStatus(address _surveyor, bool _status) public onlyAdmin {
+        authorizedSurveyors[_surveyor] = _status;
+        emit RoleAuthorizationChanged("Surveyor", _surveyor, _status);
+    }
+
+    function setLGUStatus(address _lgu, bool _status) public onlyAdmin {
+        authorizedLGUs[_lgu] = _status;
+        emit RoleAuthorizationChanged("LGU", _lgu, _status);
     }
 
     // Register a new lot coordinate draft
@@ -82,7 +121,7 @@ contract CheesePlot {
     }
 
     // Geodetic surveyor stamps the land record
-    function verifySurveyor(uint256 _id) public {
+    function verifySurveyor(uint256 _id) public onlyAuthorizedSurveyor {
         require(lots[_id].id != 0, "Lot does not exist");
         lots[_id].surveyor = msg.sender;
         emit SurveyorVerified(_id, msg.sender);
@@ -90,7 +129,7 @@ contract CheesePlot {
     }
 
     // Barangay/LGU official notarizes the land record
-    function approveLGU(uint256 _id) public {
+    function approveLGU(uint256 _id) public onlyAuthorizedLGU {
         require(lots[_id].id != 0, "Lot does not exist");
         lots[_id].LGU = msg.sender;
         emit LGUApproved(_id, msg.sender);

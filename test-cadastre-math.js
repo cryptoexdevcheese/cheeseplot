@@ -1,5 +1,6 @@
 /*
- * CheesePlot - Mathematical Verification Test Suite
+ * Blockchain Surveyor - Mathematical Verification Test Suite
+ * Validates coordinate processing, polygon area calculation, and boundary overlaps.
  */
 
 const assert = require('assert');
@@ -108,7 +109,7 @@ function calculateArea(coords) {
 }
 
 // --- Run Tests ---
-console.log("🏁 Starting CheesePlot Mathematical Verification tests...");
+console.log("🏁 Starting Blockchain Surveyor Mathematical Verification tests...");
 
 // Test 1: NMEA GNGGA Sentence parsing accuracy
 const nmeaSentence = "$GNGGA,161229.487,1435.9284,N,12058.9102,E,4,24,0.85,12.4,M,0.0,M,3.2,0210*4A";
