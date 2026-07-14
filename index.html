@@ -136,6 +136,10 @@
         <input type="text" id="manual-wallet-address" class="form-input" placeholder="0x..." style="flex:1;font-family:monospace;font-size:0.7rem;padding:0.4rem 0.5rem;">
         <button id="btn-apply-manual-wallet" class="btn-outline" style="padding:0 0.75rem;font-size:0.75rem;"><i class="fa-solid fa-check"></i> Link</button>
       </div>
+      <div style="margin-top:0.75rem;border-top:1px dashed rgba(255,255,255,0.1);padding-top:0.75rem;">
+        <label style="font-size:0.65rem;color:var(--text-muted);display:block;text-transform:uppercase;font-weight:700;letter-spacing:0.5px;">Deployed Contract Address</label>
+        <input type="text" id="deployed-contract-address" class="form-input" placeholder="0x..." style="width:100%;font-family:monospace;font-size:0.7rem;padding:0.4rem 0.5rem;margin-top:0.25rem;">
+      </div>
     </div>
 
     <!-- SMS Bridge -->
@@ -374,6 +378,13 @@
             <input type="text" id="sibling-2-address" class="form-input" style="font-size:0.7rem;font-family:monospace;" placeholder="0x..." value="0x42145465BcfF94FE53c7a362C0B0C462C07df20b">
             <button id="btn-sign-sibling-2" class="btn-primary" style="padding:0.25rem 0.5rem;font-size:0.7rem;">Sign</button>
           </div>
+        </div>
+        <div id="subdivision-confirm-wrap" class="hidden" style="margin-top:0.75rem;border-top:1px dashed rgba(59,130,246,0.3);padding-top:0.75rem;text-align:center;">
+          <div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:0.4rem;line-height:1.2;">
+            Child A: <span id="subdiv-child-a-area">0</span> sqm<br>
+            Child B: <span id="subdiv-child-b-area">0</span> sqm
+          </div>
+          <button id="btn-confirm-subdivision" class="btn-primary" style="width:100%;font-size:0.75rem;background:var(--blue-accent);border-color:var(--blue-accent);"><i class="fa-solid fa-scissors"></i> Commit Subdivision</button>
         </div>
       </div>
 

@@ -23,6 +23,66 @@ const state = {
 const MANILA = [14.5995, 120.9842];
 const DEFAULT_ZOOM = 18;
 
+// ── Cadastre Math Engine ──────────────────────────────────────
+const latRefDefault = 14.5995;
+const lonRefDefault = 120.9842;
+
+function projectToMeters(lat, lng, lat0 = latRefDefault, lon0 = lonRefDefault) {
+  const rLat0 = lat0 * Math.PI / 180;
+  const y = (lat - lat0) * 111132.95;
+  const x = (lng - lon0) * 111319.9 * Math.cos(rLat0);
+  return { x, y };
+}
+
+function checkLineIntersection(a1, a2, b1, b2) {
+  const pA1 = projectToMeters(a1.lat, a1.lng);
+  const pA2 = projectToMeters(a2.lat, a2.lng);
+  const pB1 = projectToMeters(b1.lat, b1.lng);
+  const pB2 = projectToMeters(b2.lat, b2.lng);
+
+  const det = (pA2.x - pA1.x) * (pB2.y - pB1.y) - (pA2.y - pA1.y) * (pB2.x - pB1.x);
+  if (det === 0) return false;
+
+  const t = ((pB1.x - pA1.x) * (pB2.y - pB1.y) - (pB1.y - pA1.y) * (pB2.x - pB1.x)) / det;
+  const u = ((pB1.x - pA1.x) * (pA2.y - pA1.y) - (pB1.y - pA1.y) * (pA2.x - pA1.x)) / det;
+
+  return (t >= 0 && t <= 1 && u >= 0 && u <= 1);
+}
+
+function hasSelfIntersection(coords) {
+  const n = coords.length;
+  if (n < 4) return false;
+
+  for (let i = 0; i < n; i++) {
+    const a1 = coords[i];
+    const a2 = coords[(i + 1) % n];
+
+    for (let j = i + 2; j < n; j++) {
+      if ((j + 1) % n === i) continue;
+
+      const b1 = coords[j];
+      const b2 = coords[(j + 1) % n];
+
+      if (checkLineIntersection(a1, a2, b1, b2)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function calculateArea(coords) {
+  const meters = coords.map(c => projectToMeters(c.lat, c.lng));
+  const n = meters.length;
+  let areaSum = 0;
+  for (let i = 0; i < n; i++) {
+    const nextIdx = (i + 1) % n;
+    areaSum += meters[i].x * meters[nextIdx].y;
+    areaSum -= meters[nextIdx].x * meters[i].y;
+  }
+  return Math.abs(areaSum) / 2;
+}
+
 const WORKFLOW_STEPS = [
   { id: 'connect',    label: 'Connect Rover',    icon: 'fa-satellite' },
   { id: 'ntrip',     label: 'Stream NTRIP',     icon: 'fa-tower-broadcast' },
@@ -195,8 +255,66 @@ function startGNSS() {
 }
 
 // ============================================================
-// WALLET
+// WALLET & CADASTRAL SMART CONTRACT
 // ============================================================
+const CADASTRAL_CONTRACT_ABI = [
+  "constructor()",
+  "event LotRegistered(uint256 indexed id, string indexed spatialHash, address indexed owner, uint256 area)",
+  "event BoundarySigned(uint256 indexed id, address indexed neighbor)",
+  "event SurveyorVerified(uint256 indexed id, address indexed surveyor)",
+  "event LGUApproved(uint256 indexed id, address indexed LGU)",
+  "event LotSubdivided(uint256 indexed parentId, uint256[] childIds)",
+  "event RoleAuthorizationChanged(string role, address indexed account, bool status)",
+  "function admin() view returns (address)",
+  "function lotCount() view returns (uint256)",
+  "function lots(uint256) view returns (uint256 id, string spatialHash, string coordsJson, uint256 area, address owner, address surveyor, address LGU, uint256 timestamp, bool isVerified)",
+  "function spatialHashExists(string) view returns (bool)",
+  "function neighborApprovals(uint256, address) view returns (bool)",
+  "function requiredNeighbors(uint256, uint256) view returns (address)",
+  "function authorizedSurveyors(address) view returns (bool)",
+  "function authorizedLGUs(address) view returns (bool)",
+  "function setSurveyorStatus(address _surveyor, bool _status)",
+  "function setLGUStatus(address _lgu, bool _status)",
+  "function registerLot(string _spatialHash, string _coordsJson, uint256 _area, address[] _neighbors) returns (uint256)",
+  "function signBoundary(uint256 _id)",
+  "function verifySurveyor(uint256 _id)",
+  "function approveLGU(uint256 _id)",
+  "function subdivideLot(uint256 _parentId, string[] _childHashes, string[] _childCoordsJsons, uint256[] _childAreas, address[] _siblings) returns (uint256[])",
+  "function getRequiredNeighbors(uint256 _id) view returns (address[])",
+  "function isArchived(uint256) view returns (bool)",
+  "function lotChildren(uint256, uint256) view returns (uint256)"
+];
+
+async function checkRoleAuthorizations() {
+  const address = document.getElementById('deployed-contract-address').value.trim();
+  if (!address || !ethers.isAddress(address) || !window.ethereum || !state.wallet.address) {
+    document.getElementById('badge-surveyor-auth')?.remove();
+    document.getElementById('badge-lgu-auth')?.remove();
+    return;
+  }
+  try {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const contract = new ethers.Contract(address, CADASTRAL_CONTRACT_ABI, provider);
+    const isSurveyor = await contract.authorizedSurveyors(state.wallet.address);
+    const isLGU = await contract.authorizedLGUs(state.wallet.address);
+
+    document.getElementById('badge-surveyor-auth')?.remove();
+    document.getElementById('badge-lgu-auth')?.remove();
+
+    const displaySpan = document.getElementById('wallet-address-display');
+    if (isSurveyor) {
+      displaySpan.insertAdjacentHTML('afterend', ' <span id="badge-surveyor-auth" style="font-size:0.55rem;background:#10b981;color:white;padding:2px 5px;border-radius:4px;font-weight:bold;margin-left:4px;">Surveyor</span>');
+      showToast('You are an authorized Geodetic Surveyor on-chain.', 'info');
+    }
+    if (isLGU) {
+      displaySpan.insertAdjacentHTML('afterend', ' <span id="badge-lgu-auth" style="font-size:0.55rem;background:#3b82f6;color:white;padding:2px 5px;border-radius:4px;font-weight:bold;margin-left:4px;">LGU Official</span>');
+      showToast('You are an authorized LGU official on-chain.', 'info');
+    }
+  } catch (err) {
+    console.warn('Failed checking roles:', err.message);
+  }
+}
+
 function bindWallet() {
   document.getElementById('btn-connect-wallet').addEventListener('click', async () => {
     if (!window.ethereum) { showToast('No Web3 wallet found. Please install MetaMask.', 'warning'); return; }
@@ -218,6 +336,7 @@ function bindWallet() {
 
       checkRegisterReady();
       renderMyLots();
+      checkRoleAuthorizations();
       showToast('Wallet connected!', 'success');
     } catch (err) {
       showToast('Connection failed: ' + err.message, 'error');
@@ -254,11 +373,25 @@ function bindWallet() {
 
       checkRegisterReady();
       renderMyLots();
+      checkRoleAuthorizations();
       showToast('Manual wallet connected!', 'success');
     } catch (err) {
       showToast('Failed to connect: ' + err.message, 'error');
     }
   });
+
+  const contractInput = document.getElementById('deployed-contract-address');
+  if (contractInput) {
+    contractInput.value = localStorage.getItem('cheese_surveyor_contract_address') || '';
+    contractInput.addEventListener('input', () => {
+      localStorage.setItem('cheese_surveyor_contract_address', contractInput.value.trim());
+      checkRoleAuthorizations();
+    });
+    // Check if already connected
+    if (state.wallet.connected) {
+      checkRoleAuthorizations();
+    }
+  }
 }
 
 // ============================================================
@@ -367,6 +500,12 @@ function stopNTRIP() {
 // BOUNDARY PLOTTING
 // ============================================================
 function addBoundaryPoint(latlng) {
+  const tempPoints = [...state.boundary.points, latlng];
+  if (tempPoints.length >= 4 && hasSelfIntersection(tempPoints)) {
+    showToast('Boundary self-intersection detected! Node rejected.', 'error');
+    return;
+  }
+
   const idx  = state.boundary.points.length;
   const icon = L.divIcon({
     className: '',
@@ -379,7 +518,16 @@ function addBoundaryPoint(latlng) {
 
   marker.on('dragend', () => {
     const i = state.boundary.markers.indexOf(marker);
-    if (i >= 0) { state.boundary.points[i] = marker.getLatLng(); refresh(); }
+    if (i >= 0) {
+      const oldLatLng = state.boundary.points[i];
+      state.boundary.points[i] = marker.getLatLng();
+      if (state.boundary.points.length >= 4 && hasSelfIntersection(state.boundary.points)) {
+        showToast('Invalid drag: boundary self-intersection! Reverted.', 'error');
+        state.boundary.points[i] = oldLatLng;
+        marker.setLatLng(oldLatLng);
+      }
+      refresh();
+    }
   });
   marker.on('contextmenu', () => {
     const i = state.boundary.markers.indexOf(marker);
@@ -396,6 +544,12 @@ function addBoundaryPoint(latlng) {
       }));
     });
     refresh();
+  });
+
+  marker.on('click', () => {
+    if (state.subdivision && state.subdivision.active) {
+      handleSubdivisionNodeClick(marker);
+    }
   });
 
   state.boundary.points.push(latlng);
@@ -493,8 +647,30 @@ function calcStats() {
 }
 
 function checkEncroachment() {
-  const show = state.boundary.points.length > 5 && state.neighbor.active;
-  document.getElementById('encroachment-warning').classList.toggle('hidden', !show);
+  if (!state.neighbor.active || state.boundary.points.length < 3) {
+    document.getElementById('encroachment-warning').classList.add('hidden');
+    return;
+  }
+
+  const neighborPts = state.neighbor.polygon.getLatLngs()[0];
+  let intersects = false;
+  const myPts = state.boundary.points;
+
+  for (let i = 0; i < myPts.length; i++) {
+    const a1 = myPts[i];
+    const a2 = myPts[(i + 1) % myPts.length];
+    for (let j = 0; j < neighborPts.length; j++) {
+      const b1 = neighborPts[j];
+      const b2 = neighborPts[(j + 1) % neighborPts.length];
+      if (checkLineIntersection(a1, a2, b1, b2)) {
+        intersects = true;
+        break;
+      }
+    }
+    if (intersects) break;
+  }
+
+  document.getElementById('encroachment-warning').classList.toggle('hidden', !intersects);
 }
 
 // ============================================================
@@ -813,6 +989,7 @@ function triggerDownload(filename, content, mime) {
 function bindSubdivision() {
   document.getElementById('btn-subdivide-mode').addEventListener('click', () => {
     state.subdivision.active = true;
+    state.subdivision.selectedNodes = [];
     document.getElementById('btn-subdivide-mode').classList.add('hidden');
     document.getElementById('btn-cancel-subdivide').classList.remove('hidden');
     document.getElementById('subdivision-sibling-panel').classList.remove('hidden');
@@ -820,10 +997,7 @@ function bindSubdivision() {
   });
 
   document.getElementById('btn-cancel-subdivide').addEventListener('click', () => {
-    state.subdivision.active = false;
-    document.getElementById('btn-subdivide-mode').classList.remove('hidden');
-    document.getElementById('btn-cancel-subdivide').classList.add('hidden');
-    document.getElementById('subdivision-sibling-panel').classList.add('hidden');
+    clearSubdivision();
   });
 
   document.getElementById('btn-sign-sibling-1').addEventListener('click', () => {
@@ -832,6 +1006,189 @@ function bindSubdivision() {
   document.getElementById('btn-sign-sibling-2').addEventListener('click', () => {
     stampBtn('btn-sign-sibling-2', 'Sibling #2');
   });
+
+  document.getElementById('btn-confirm-subdivision').addEventListener('click', confirmSubdivision);
+}
+
+function clearSubdivision() {
+  state.subdivision.active = false;
+  state.subdivision.selectedNodes = [];
+  if (state.subdivision.polyline) {
+    state.map.instance.removeLayer(state.subdivision.polyline);
+    state.subdivision.polyline = null;
+  }
+  document.getElementById('btn-subdivide-mode').classList.remove('hidden');
+  document.getElementById('btn-cancel-subdivide').classList.add('hidden');
+  document.getElementById('subdivision-sibling-panel').classList.add('hidden');
+  document.getElementById('subdivision-confirm-wrap').classList.add('hidden');
+
+  // Reset highlighted node colors
+  state.boundary.markers.forEach((m) => {
+    const el = m.getElement()?.querySelector('.b-node');
+    if (el) el.style.background = '';
+  });
+}
+
+function handleSubdivisionNodeClick(marker) {
+  const i = state.boundary.markers.indexOf(marker);
+  if (i < 0) return;
+
+  if (state.subdivision.selectedNodes.includes(i)) return;
+
+  state.subdivision.selectedNodes.push(i);
+  const el = marker.getElement()?.querySelector('.b-node');
+  if (el) el.style.background = 'var(--blue-accent)';
+  showToast(`Node ${i + 1} selected for split`, 'info');
+
+  if (state.subdivision.selectedNodes.length === 2) {
+    drawSubdivisionSplit();
+  }
+}
+
+function drawSubdivisionSplit() {
+  const [idx1, idx2] = state.subdivision.selectedNodes;
+  const pts = state.boundary.points;
+  const p1 = pts[idx1];
+  const p2 = pts[idx2];
+
+  state.subdivision.polyline = L.polyline([p1, p2], {
+    color: 'var(--blue-accent)',
+    weight: 3,
+    dashArray: '6 6'
+  }).addTo(state.map.instance);
+
+  const minIdx = Math.min(idx1, idx2);
+  const maxIdx = Math.max(idx1, idx2);
+
+  // Split calculations
+  const child1Pts = pts.slice(minIdx, maxIdx + 1);
+  const child2Pts = [...pts.slice(maxIdx), ...pts.slice(0, minIdx + 1)];
+
+  state.subdivision.child1 = child1Pts;
+  state.subdivision.child2 = child2Pts;
+
+  const area1 = calculateArea(child1Pts);
+  const area2 = calculateArea(child2Pts);
+
+  state.subdivision.area1 = area1;
+  state.subdivision.area2 = area2;
+
+  document.getElementById('subdiv-child-a-area').textContent = area1.toFixed(2);
+  document.getElementById('subdiv-child-b-area').textContent = area2.toFixed(2);
+  document.getElementById('subdivision-confirm-wrap').classList.remove('hidden');
+  showToast('Split line drawn! Ready to commit subdivision.', 'success');
+}
+
+async function confirmSubdivision() {
+  if (!state.wallet.connected) { showToast('Connect your wallet first.', 'warning'); return; }
+
+  const btn = document.getElementById('btn-confirm-subdivision');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Subdividing lot...';
+
+  const contractAddress = document.getElementById('deployed-contract-address').value.trim();
+  let txHash, childAId, childBId, block;
+
+  const child1Pts = state.subdivision.child1;
+  const child2Pts = state.subdivision.child2;
+  const area1 = state.subdivision.area1;
+  const area2 = state.subdivision.area2;
+
+  const sibling1 = document.getElementById('sibling-1-address').value.trim();
+  const sibling2 = document.getElementById('sibling-2-address').value.trim();
+  const siblings = [sibling1, sibling2].filter(w => /^0x[a-fA-F0-9]{40}$/.test(w));
+
+  if (contractAddress && ethers.isAddress(contractAddress) && window.ethereum) {
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(contractAddress, CADASTRAL_CONTRACT_ABI, signer);
+
+      const lastLot = state.myLots[0];
+      let parentId = 1;
+      if (lastLot && lastLot.parcelId && lastLot.parcelId.includes('CHZ-LOT-')) {
+        const idPart = lastLot.parcelId.split('CHZ-LOT-')[1];
+        if (!isNaN(idPart)) parentId = Number(idPart);
+      }
+
+      // Prepare contract args
+      const hash1 = ethers.id(JSON.stringify(child1Pts));
+      const hash2 = ethers.id(JSON.stringify(child2Pts));
+      const hashes = [hash1, hash2];
+      
+      const jsons = [JSON.stringify(child1Pts), JSON.stringify(child2Pts)];
+      const areas = [Math.round(area1), Math.round(area2)];
+
+      showToast('Confirm subdivision in MetaMask...', 'info');
+      const tx = await contract.subdivideLot(parentId, hashes, jsons, areas, siblings);
+      showToast('Broadcasting transaction...', 'info');
+      
+      const receipt = await tx.wait();
+      txHash = receipt.hash;
+      block = receipt.blockNumber;
+
+      // Extract new Lot IDs
+      const lotIds = [];
+      for (const log of receipt.logs) {
+        try {
+          const parsedLog = contract.interface.parseLog(log);
+          if (parsedLog && parsedLog.name === 'LotRegistered') {
+            lotIds.push(Number(parsedLog.args[0]));
+          }
+        } catch (e) {}
+      }
+
+      childAId = lotIds[0] || (Number(await contract.lotCount()) - 1);
+      childBId = lotIds[1] || Number(await contract.lotCount());
+      
+      showToast('Lot subdivided successfully on-chain!', 'success');
+    } catch (err) {
+      showToast('Subdivision failed: ' + err.message, 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-scissors"></i> Commit Subdivision';
+      return;
+    }
+  } else {
+    showToast('Running in local simulation mode (No contract address configured).', 'info');
+    await sleep(2500);
+    txHash = `0x${randomHex(64)}`;
+    childAId = `MOCK-A-${Date.now().toString(36).toUpperCase()}`;
+    childBId = `MOCK-B-${Date.now().toString(36).toUpperCase()}`;
+    block = Math.floor(Math.random() * 9_000_000 + 1_000_000);
+  }
+
+  // Create new lots
+  const lotA = {
+    parcelId: `CHZ-LOT-${childAId}`,
+    txHash, block,
+    area: area1.toFixed(2),
+    perimeter: (area1 * 0.12).toFixed(2),
+    points: child1Pts,
+    owner: state.wallet.address,
+    ts: new Date().toISOString(),
+  };
+
+  const lotB = {
+    parcelId: `CHZ-LOT-${childBId}`,
+    txHash, block,
+    area: area2.toFixed(2),
+    perimeter: (area2 * 0.12).toFixed(2),
+    points: child2Pts,
+    owner: state.wallet.address,
+    ts: new Date().toISOString(),
+  };
+
+  state.myLots.unshift(lotB);
+  state.myLots.unshift(lotA);
+  saveMyLots();
+  renderMyLots();
+  
+  addLedgerRow(lotB);
+  addLedgerRow(lotA);
+
+  clearSubdivision();
+  showTxReceipt(txHash, `CHZ-LOT-${childAId} & CHZ-LOT-${childBId}`, block);
+  showToast('Subdivision sealed on-chain!', 'success');
 }
 
 function stampBtn(id, label) {
@@ -864,16 +1221,49 @@ function bindNeighborConsensus() {
   });
 }
 
-function signNeighbor(idx) {
+async function signNeighbor(idx) {
   const row = document.getElementById(`n-row-${idx}`);
   if (!row) return;
   const btn = row.querySelector('button');
+
+  const contractAddress = document.getElementById('deployed-contract-address').value.trim();
+  if (contractAddress && ethers.isAddress(contractAddress) && window.ethereum) {
+    btn.disabled  = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> signing…';
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(contractAddress, CADASTRAL_CONTRACT_ABI, signer);
+
+      const lastLot = state.myLots[0];
+      let lotId = 1;
+      if (lastLot && lastLot.parcelId && lastLot.parcelId.includes('CHZ-LOT-')) {
+        const idPart = lastLot.parcelId.split('CHZ-LOT-')[1];
+        if (!isNaN(idPart)) {
+          lotId = Number(idPart);
+        }
+      }
+
+      showToast('Confirm signature transaction in MetaMask...', 'info');
+      const tx = await contract.signBoundary(lotId);
+      showToast('Submitting signature...', 'info');
+      await tx.wait();
+      showToast(`Neighbor boundary signature verified on-chain!`, 'success');
+    } catch (err) {
+      showToast('On-chain signing failed: ' + err.message, 'error');
+      btn.disabled  = false;
+      btn.innerHTML = '<i class="fa-solid fa-pen-nib"></i> Sign';
+      return;
+    }
+  } else {
+    showToast('Running in local simulation mode.', 'info');
+  }
+
   btn.innerHTML        = '<i class="fa-solid fa-check"></i> Signed';
   btn.style.background = 'rgba(16,185,129,0.2)';
   btn.style.borderColor = 'var(--green-accent)';
   btn.disabled         = true;
   state.cadastral.neighborsSigned++;
-  showToast(`Neighbor #${idx + 1} signed!`, 'success');
   if (state.cadastral.neighborsSigned >= 1) advanceTo(4);
   checkRegisterReady();
 }
@@ -882,24 +1272,106 @@ function signNeighbor(idx) {
 // NOTARIZATIONS
 // ============================================================
 function bindNotarizations() {
-  document.getElementById('btn-lgu-approve').addEventListener('click', () => {
+  document.getElementById('btn-lgu-approve').addEventListener('click', async () => {
     if (!state.wallet.connected) { showToast('Connect wallet first.', 'warning'); return; }
+
+    const btn = document.getElementById('btn-lgu-approve');
+    const contractAddress = document.getElementById('deployed-contract-address').value.trim();
+    
+    if (contractAddress && ethers.isAddress(contractAddress) && window.ethereum) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Notarizing...';
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        const contract = new ethers.Contract(contractAddress, CADASTRAL_CONTRACT_ABI, signer);
+
+        const lastLot = state.myLots[0];
+        let lotId = 1;
+        if (lastLot && lastLot.parcelId && lastLot.parcelId.includes('CHZ-LOT-')) {
+          const idPart = lastLot.parcelId.split('CHZ-LOT-')[1];
+          if (!isNaN(idPart)) lotId = Number(idPart);
+        }
+
+        const isLGU = await contract.authorizedLGUs(state.wallet.address);
+        if (!isLGU) {
+          showToast('Failed: Your connected wallet is not an authorized LGU official.', 'error');
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-stamp"></i> Seal Barangay Approval';
+          return;
+        }
+
+        showToast('Confirm LGU approval transaction in MetaMask...', 'info');
+        const tx = await contract.approveLGU(lotId);
+        showToast('Submitting LGU approval...', 'info');
+        await tx.wait();
+        showToast('Barangay LGU approval sealed on-chain!', 'success');
+      } catch (err) {
+        showToast('LGU approval failed: ' + err.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-stamp"></i> Seal Barangay Approval';
+        return;
+      }
+    } else {
+      showToast('Running in local simulation mode.', 'info');
+    }
+
     state.cadastral.lguApproved = true;
     setText('lgu-notary-address', `Approved — ${new Date().toLocaleDateString('en-PH')}`);
     document.getElementById('lgu-notary-address').style.color = 'var(--green-accent)';
     greenBtn('btn-lgu-approve', 'Approved');
-    showToast('Barangay LGU approval sealed!', 'success');
     if (state.cadastral.surveyorVerified) advanceTo(5);
     checkRegisterReady();
   });
 
-  document.getElementById('btn-surveyor-verify').addEventListener('click', () => {
+  document.getElementById('btn-surveyor-verify').addEventListener('click', async () => {
     if (!state.wallet.connected) { showToast('Connect wallet first.', 'warning'); return; }
+
+    const btn = document.getElementById('btn-surveyor-verify');
+    const contractAddress = document.getElementById('deployed-contract-address').value.trim();
+
+    if (contractAddress && ethers.isAddress(contractAddress) && window.ethereum) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying...';
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        const contract = new ethers.Contract(contractAddress, CADASTRAL_CONTRACT_ABI, signer);
+
+        const lastLot = state.myLots[0];
+        let lotId = 1;
+        if (lastLot && lastLot.parcelId && lastLot.parcelId.includes('CHZ-LOT-')) {
+          const idPart = lastLot.parcelId.split('CHZ-LOT-')[1];
+          if (!isNaN(idPart)) lotId = Number(idPart);
+        }
+
+        const isSurveyor = await contract.authorizedSurveyors(state.wallet.address);
+        if (!isSurveyor) {
+          showToast('Failed: Your connected wallet is not an authorized Geodetic Surveyor.', 'error');
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Stamp surveyor Seal';
+          return;
+        }
+
+        showToast('Confirm Surveyor verification transaction in MetaMask...', 'info');
+        const tx = await contract.verifySurveyor(lotId);
+        showToast('Submitting Surveyor verification...', 'info');
+        await tx.wait();
+        showToast('Geodetic Surveyor stamp verified on-chain!', 'success');
+      } catch (err) {
+        showToast('Surveyor verification failed: ' + err.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Stamp surveyor Seal';
+        return;
+      }
+    } else {
+      showToast('Running in local simulation mode.', 'info');
+    }
+
     state.cadastral.surveyorVerified = true;
     setText('surveyor-notary-address', `Verified — ${new Date().toLocaleDateString('en-PH')}`);
     document.getElementById('surveyor-notary-address').style.color = 'var(--green-accent)';
     greenBtn('btn-surveyor-verify', 'Verified');
-    showToast('Geodetic surveyor stamp applied!', 'success');
     if (state.cadastral.lguApproved) advanceTo(5);
     checkRegisterReady();
   });
@@ -921,11 +1393,61 @@ function bindRegistration() {
     btn.disabled    = true;
     btn.innerHTML   = '<i class="fa-solid fa-spinner fa-spin"></i> Broadcasting to chain…';
 
-    await sleep(2800);
+    const contractAddress = document.getElementById('deployed-contract-address').value.trim();
+    let txHash, parcelId, block;
 
-    const txHash   = `0x${randomHex(64)}`;
-    const parcelId = `CHZ-LOT-${Date.now().toString(36).toUpperCase()}`;
-    const block    = Math.floor(Math.random() * 9_000_000 + 1_000_000);
+    if (contractAddress && ethers.isAddress(contractAddress) && window.ethereum) {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        const contract = new ethers.Contract(contractAddress, CADASTRAL_CONTRACT_ABI, signer);
+
+        const coordsJson = JSON.stringify(state.boundary.points.map(p => ({ lat: p.lat, lng: p.lng })));
+        const spatialHash = ethers.id(coordsJson);
+        const areaInt = Math.round(state.boundary.area);
+        
+        const neighbors = document.getElementById('neighbor-wallets-input').value
+          .split('\n')
+          .map(w => w.trim())
+          .filter(w => /^0x[a-fA-F0-9]{40}$/.test(w));
+
+        showToast('Confirm transaction in MetaMask...', 'info');
+        const tx = await contract.registerLot(spatialHash, coordsJson, areaInt, neighbors);
+        showToast('Transaction submitted! Waiting for confirmation...', 'info');
+        
+        const receipt = await tx.wait();
+        txHash = receipt.hash;
+        block = receipt.blockNumber;
+
+        let lotId = 0;
+        for (const log of receipt.logs) {
+          try {
+            const parsedLog = contract.interface.parseLog(log);
+            if (parsedLog && parsedLog.name === 'LotRegistered') {
+              lotId = Number(parsedLog.args[0]);
+              break;
+            }
+          } catch (e) {}
+        }
+        if (!lotId || lotId === 0) {
+          lotId = Number(await contract.lotCount());
+        }
+
+        parcelId = `CHZ-LOT-${lotId}`;
+        showToast('Lot registered on-chain successfully!', 'success');
+      } catch (err) {
+        showToast('On-chain registration failed: ' + err.message, 'error');
+        btn.disabled  = false;
+        btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Register Lot';
+        return;
+      }
+    } else {
+      showToast('Running in local simulation mode (No contract address configured).', 'info');
+      await sleep(2000);
+      txHash   = `0x${randomHex(64)}`;
+      parcelId = `CHZ-LOT-MOCK-${Date.now().toString(36).toUpperCase()}`;
+      block    = Math.floor(Math.random() * 9_000_000 + 1_000_000);
+    }
 
     btn.innerHTML        = '<i class="fa-solid fa-circle-check"></i> Registered On-Chain!';
     btn.style.background = 'rgba(16,185,129,0.25)';
@@ -956,7 +1478,10 @@ function showTxReceipt(txHash, parcelId, block) {
   setText('tx-receipt-block',     `#${block.toLocaleString()}`);
   setText('tx-receipt-time',      new Date().toLocaleString('en-PH'));
   const link = document.getElementById('tx-explorer-link');
-  if (link) link.href = `https://etherscan.io/tx/${txHash}`;
+  if (link) {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    link.href = isLocal ? `http://localhost:8080/explorer/` : `https://cheeseblockchain.com/explorer/`;
+  }
   document.getElementById('tx-receipt-modal').classList.remove('hidden');
 }
 
