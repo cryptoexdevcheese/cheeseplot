@@ -223,6 +223,42 @@ function bindWallet() {
       showToast('Connection failed: ' + err.message, 'error');
     }
   });
+
+  document.getElementById('btn-apply-manual-wallet').addEventListener('click', () => {
+    const address = document.getElementById('manual-wallet-address').value.trim();
+    if (!address) {
+      showToast('Please enter a wallet address.', 'warning');
+      return;
+    }
+    // Basic Ethereum address format check
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      showToast('Invalid Ethereum address format.', 'error');
+      return;
+    }
+    try {
+      state.wallet.address   = address;
+      state.wallet.connected = true;
+      if (!state.wallet.nsurvey) {
+        state.wallet.nsurvey = parseFloat((Math.random() * 120 + 5).toFixed(2));
+      }
+
+      setText('wallet-address-display', `${state.wallet.address.slice(0,6)}…${state.wallet.address.slice(-4)}`);
+      setText('survey-balance', `${state.wallet.nsurvey} SURVEY`);
+      document.getElementById('survey-balance-wrap').classList.remove('hidden');
+
+      // Change button state to indicate success
+      const btn = document.getElementById('btn-connect-wallet');
+      btn.innerHTML         = '<i class="fa-solid fa-circle-check"></i> Wallet Linked';
+      btn.style.background  = 'rgba(16,185,129,0.2)';
+      btn.style.borderColor = 'rgba(16,185,129,0.4)';
+
+      checkRegisterReady();
+      renderMyLots();
+      showToast('Manual wallet connected!', 'success');
+    } catch (err) {
+      showToast('Failed to connect: ' + err.message, 'error');
+    }
+  });
 }
 
 // ============================================================
